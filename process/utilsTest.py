@@ -31,6 +31,38 @@ def push_message_to_mqtt(value):
     print("pushMessageToMQTT", value)
     client.publish(topic, value)
 
+# def update_traffic_light(frame, traffic_light_status, countdown_timer):
+#     global light_timer
+
+#     red_color = (0, 0, 255)
+#     green_color = (0, 255, 0)
+#     yellow_color = (0, 255, 255)
+
+#     if traffic_light_status == 'Green':
+#         color = green_color
+#         status_value = 0
+#     elif traffic_light_status == 'Red':
+#         color = red_color
+#         status_value = 1
+#     else:
+#         color = yellow_color
+#         status_value = 0
+
+#     # Kiểm tra nếu đã đủ thời gian để gửi tín hiệu mới
+#     if light_timer <= 0:
+#         push_message_to_mqtt(status_value)
+#         light_timer = 5  # Đặt lại đếm thời gian
+
+#     cv2.putText(frame, traffic_light_status, (20, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, color, 2, cv2.LINE_AA)
+#     cv2.putText(frame, f"{traffic_light_status} - {countdown_timer}", (20, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, color, 2, cv2.LINE_AA)
+
+#     return status_value
+
+
+
+
+light_timer = 5  # Khởi tạo đếm thời gian
+
 def update_traffic_light(frame, traffic_light_status, countdown_timer):
     global light_timer
 
@@ -50,13 +82,16 @@ def update_traffic_light(frame, traffic_light_status, countdown_timer):
 
     # Kiểm tra nếu đã đủ thời gian để gửi tín hiệu mới
     if light_timer <= 0:
-        push_message_to_mqtt(status_value)
+        
         light_timer = 5  # Đặt lại đếm thời gian
+
+        # Cập nhật giá trị trong danh sách
 
     cv2.putText(frame, traffic_light_status, (20, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, color, 2, cv2.LINE_AA)
     cv2.putText(frame, f"{traffic_light_status} - {countdown_timer}", (20, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, color, 2, cv2.LINE_AA)
-
+   
     return status_value
+
 
 def count_cars_in_frame(frame):
     classNames = ["person","bicycle","car","motorcycle","airplane","bus","train","truck",
@@ -128,6 +163,7 @@ def create_quad_display(video_paths):
 
         car_counts = []
         is_train_detected_list = []
+        traffic_lights = []
 
         for i, frame in enumerate(frames_resized):
             car_count, is_train_detected = count_cars_in_frame(frame)
@@ -144,9 +180,10 @@ def create_quad_display(video_paths):
         for i, frame in enumerate(frames_resized):
             if is_yellow_light:
                 # Hiển thị đèn vàng nếu đang ở trạng thái đèn vàng
-                update_traffic_light(frame, 'Yellow', countdown_timer)
+                value = update_traffic_light(frame, 'Yellow', countdown_timer)
                 cv2.putText(quad_frame, f'Traffic Light {i + 1}: Yellow', (20, 20 + (i + 1) * 30),
                             cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 255), 2)
+                traffic_lights.append(value)
             else:
                 # Xác định trạng thái đèn giao thông dựa trên quy tắc mới
                 if any_train_detected:
@@ -158,9 +195,12 @@ def create_quad_display(video_paths):
                     traffic_light_status = 'Green' if i == max_car_count_index else 'Red'
 
                 # Cập nhật đèn giao thông và hiển thị trên frame
-                update_traffic_light(frame, traffic_light_status, countdown_timer)
+                value = update_traffic_light(frame, traffic_light_status, countdown_timer)
                 cv2.putText(quad_frame, f'Traffic Light {i + 1}: {traffic_light_status}', (20, 20 + (i + 1) * 30),
                             cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
+                traffic_lights.append(value)
+        
+        print(traffic_lights)
 
         if not any_train_detected:
             if is_yellow_light:
@@ -181,6 +221,9 @@ def create_quad_display(video_paths):
             y1, y2 = y * h, (y + 1) * h
             x1, x2 = x * w, (x + 1) * w
             quad_frame[y1:y2, x1:x2] = frame
+        
+        push_message_to_mqtt(traffic_lights[3])
+        print(traffic_lights[3])
 
         cv2.imshow('Quad Display', quad_frame)
 
